@@ -189,22 +189,23 @@ async function compressImage(fileOrBlob, maxWidth = 1600, quality = 0.8) {
 
 /* ── PDF generation ────────────────────────────────────── */
 async function generatePDF(session, opts = { saveAs: true }) {
+  // html2pdf produces a zero-height canvas when the source element is
+  // position:absolute (regardless of left/top). It needs the source in
+  // NORMAL document flow to compute pagination correctly. The wrap
+  // pattern: outer wrapper is position:fixed off-screen and invisible
+  // (so it doesn't affect page layout), inner .pdf-render stays in
+  // normal flow within the wrap.
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'position:fixed;top:0;left:-99999px;width:7.4in;visibility:hidden;pointer-events:none;z-index:-1;';
   const div = document.createElement('div');
   div.className = 'pdf-render';
   div.innerHTML = renderPDFHTML(session);
-  // Position off-screen-LEFT (not far above viewport) so the element lays
-  // out properly and html2canvas can capture via getBoundingClientRect.
-  // `position: fixed; top: -99999px` produces a blank capture because
-  // html2canvas can't reach the rendered pixels at that offset.
-  div.style.position = 'absolute';
-  div.style.left = '-10000px';
-  div.style.top = '0';
-  div.style.width = '7.4in';
-  document.body.appendChild(div);
+  wrap.appendChild(div);
+  document.body.appendChild(wrap);
 
-  // Give the browser one frame to compute layout for any embedded
-  // base64 screenshots before we ask html2canvas to capture.
-  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 60)));
+  // One frame + small delay so any embedded base64 screenshots layout.
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 80)));
 
   try {
     const filename = `bug-report_${session.testerName.replace(/\s+/g, '-')}_${formatDateShort(session.startedAt).replace(/[\s,]+/g, '-')}_${shortId(session.id)}.pdf`;
@@ -217,8 +218,6 @@ async function generatePDF(session, opts = { saveAs: true }) {
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        windowWidth: div.scrollWidth,
-        windowHeight: div.scrollHeight,
       },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -226,7 +225,7 @@ async function generatePDF(session, opts = { saveAs: true }) {
     if (opts.saveAs) await html2pdf().set(opt).from(div).save();
     return { filename };
   } finally {
-    div.remove();
+    wrap.remove();
   }
 }
 
