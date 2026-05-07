@@ -78,6 +78,11 @@
 /* ── Base ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The HTML [hidden] attribute defaults to display:none, but author CSS
+   that sets display: (e.g. .modal {display:flex}, .lock-screen {display:flex})
+   can override it. Forcing this rule here so [hidden] always wins.       */
+[hidden] { display: none !important; }
+
 html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
