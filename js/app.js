@@ -192,15 +192,34 @@ async function generatePDF(session, opts = { saveAs: true }) {
   const div = document.createElement('div');
   div.className = 'pdf-render';
   div.innerHTML = renderPDFHTML(session);
+  // Position off-screen-LEFT (not far above viewport) so the element lays
+  // out properly and html2canvas can capture via getBoundingClientRect.
+  // `position: fixed; top: -99999px` produces a blank capture because
+  // html2canvas can't reach the rendered pixels at that offset.
+  div.style.position = 'absolute';
+  div.style.left = '-10000px';
+  div.style.top = '0';
+  div.style.width = '7.4in';
   document.body.appendChild(div);
-  div.style.position = 'fixed'; div.style.top = '-99999px';
+
+  // Give the browser one frame to compute layout for any embedded
+  // base64 screenshots before we ask html2canvas to capture.
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 60)));
+
   try {
     const filename = `bug-report_${session.testerName.replace(/\s+/g, '-')}_${formatDateShort(session.startedAt).replace(/[\s,]+/g, '-')}_${shortId(session.id)}.pdf`;
     const opt = {
       margin: [0.4, 0.4, 0.4, 0.4],
       filename,
       image: { type: 'jpeg', quality: 0.92 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: div.scrollWidth,
+        windowHeight: div.scrollHeight,
+      },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
