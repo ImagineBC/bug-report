@@ -220,7 +220,10 @@ async function generatePDF(session, opts = { saveAs: true }) {
         logging: false,
       },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      // Keep each .pdf-finding intact across pages. `avoid-all` was too eager
+      // (treats every element as unsplittable, gets confused) — explicit
+      // `avoid: '.pdf-finding'` is the targeted version.
+      pagebreak: { mode: ['css', 'legacy'], avoid: '.pdf-finding' }
     };
     if (opts.saveAs) await html2pdf().set(opt).from(div).save();
     return { filename };
